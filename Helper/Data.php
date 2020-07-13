@@ -49,6 +49,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     const XML_SEND_PROMO             = 'mailchimp/ecommerce/send_promo';
     const XML_INCLUDING_TAXES        = 'mailchimp/ecommerce/including_taxes';
 
+
+    const FORMAT_DATE = 'Y-m-d H:i:s';
+
     const ORDER_STATE_OK             = 'complete';
 
     const GUEST_GROUP                = 'NOT LOGGED IN';
@@ -212,6 +215,9 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     private $customerAtt    = null;
     private $_mapFields     = null;
 
+
+    private $dateTimeFactory;
+
     /**
      * Data constructor.
      * @param \Magento\Framework\App\Helper\Context $context
@@ -271,7 +277,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         \Ebizmarts\MailChimp\Model\MailChimpInterestGroupFactory $interestGroupFactory,
         \Magento\Framework\Serialize\Serializer\Json $serializer,
         \Magento\Framework\App\DeploymentConfig $deploymentConfig,
-        \Magento\Framework\Stdlib\DateTime\DateTime $date
+	\Magento\Framework\Stdlib\DateTime\DateTime $date,
+	\Magento\Framework\Stdlib\DateTime\DateTimeFactory $dateTimeFactory
     ) {
 
         $this->_storeManager  = $storeManager;
@@ -303,7 +310,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $this->_interestGroupFactory    = $interestGroupFactory;
         $this->_serializer              = $serializer;
         $this->_deploymentConfig        = $deploymentConfig;
-        $this->_date                    = $date;
+	$this->_date                    = $date;
+	$this->dateTimeFactory = $dateTimeFactory;
         parent::__construct($context);
     }
 
@@ -364,10 +372,10 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 } catch (\Exception $e) {
                     $options = [];
                 }
-                $isDate = ($item->getBackendModel()==\Magento\Eav\Model\Entity\Attribute\Backend\Datetime::class) ? 1:0;
+                $isDate = ($item->getBackendModel()==Magento\Eav\Model\Entity\Attribute\Backend\Datetime::class) ? 1:0;
                 $isAddress = (
-                    $item->getBackendModel()==\Magento\Customer\Model\Customer\Attribute\Backend\Billing::class ||
-                    $item->getBackendModel()==\Magento\Customer\Model\Customer\Attribute\Backend\Shipping::class) ? 1:0;
+                    $item->getBackendModel()==Magento\Customer\Model\Customer\Attribute\Backend\Billing::class ||
+                    $item->getBackendModel()==Magento\Customer\Model\Customer\Attribute\Backend\Shipping::class) ? 1:0;
                 $ret[$item->getId()] = [
                     'attCode' => $item->getAttributeCode(),
                     'isDate' =>$isDate,
@@ -379,10 +387,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             $this->customerAtt = $ret;
         }
         return $this->customerAtt;
-    }
-    public function resetMapFields()
-    {
-        $this->_mapFields = null;
     }
     public function getMapFields($storeId = null)
     {
@@ -408,9 +412,37 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
         return $this->_mapFields;
     }
-    public function getDateFormat()
+	
+    /**
+	    *      * Custom Date format
+	    *           */
+//        const FORMAT_DATE = 'd-m-Y H:i:s';
+
+        /**
+	 *      * @var DateTimeFactory
+	 *           */
+//        private $dateTimeFactory;
+
+//	    public function __construct(
+//		   DateTimeFactory $dateTimeFactory
+//	 ) {
+//		  $this->dateTimeFactory = $dateTimeFactory;
+//	    }
+
+	    /**
+		    *      * Get Current Format date
+		    *           *
+		    *                * @return string
+		    *                     */
+     
+
+
+    public function getDateFormat(): string
     {
-        return 'm/d/Y';
+	    // return 'm/d/Y';
+	    
+	    $dateModel = $this->dateTimeFactory->create();
+	    return $dateModel->gmtDate(self::FORMAT_DATE);
     }
 
     /**
@@ -619,7 +651,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     }
     public function getMCMinSyncDateFlag($storeId = null)
     {
-        return $this->getConfigValue(self::XML_PATH_SYNC_DATE, $storeId);
+	   // return $this->getConfigValue(self::XML_PATH_SYNC_DATE, $storeId);
+	    return $format = $this->getDateFormat();
     }
     public function getBaseDir()
     {
@@ -735,7 +768,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
      */
     public function getMergeVarsByCustomer(\Magento\Customer\Model\Customer $customer, $email)
     {
-        return $this->getMergeVars($customer, $customer->getData('store_id'));
+        return $this->getMergeVars($customer, $customer->getStoreId());
     }
 
     public function getGeneralList($storeId)
@@ -920,30 +953,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
         }
     }
-    public function saveJsUrl($storeId, $scope = null, $mailChimpStoreId = null)
-    {
-        if (!$scope) {
-            $scope = \Magento\Store\Model\ScopeInterface::SCOPE_STORES;
-        }
-        if ($this->getConfigValue(self::XML_PATH_ACTIVE, $storeId, $scope)) {
-            try {
-                $api = $this->getApi($storeId);
-                $storeData = $api->ecommerce->stores->get($mailChimpStoreId);
-                if (isset($storeData['connected_site']['site_script']['url'])) {
-                    $url = $storeData['connected_site']['site_script']['url'];
-                    $this->_config->saveConfig(
-                        self::XML_MAILCHIMP_JS_URL,
-                        $url,
-                        $scope,
-                        $storeId
-                    );
-                }
-            } catch (\Mailchimp_Error $e) {
-                $this->log($e->getFriendlyMessage());
-            }
-        }
-
-    }
     public function getJsUrl($storeId)
     {
         $url = $this->getConfigValue(self::XML_MAILCHIMP_JS_URL, $storeId);
@@ -1082,7 +1091,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     /**
      * @param $tableName
-     * @param string $conn
      * @return string
      */
     public function getTableName($tableName, $conn = ResourceConnection::DEFAULT_CONNECTION)
@@ -1125,7 +1133,6 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 }
             } else {
                 $this->log(__('Error retrieving interest groups for store ').$storeId);
-                $rc = [];
             }
         } catch (\Mailchimp_Error $e) {
             $this->log($e->getFriendlyMessage());
@@ -1140,15 +1147,16 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         /**
          * @var $interestGroup \Ebizmarts\MailChimp\Model\MailChimpInterestGroup
          */
+
         $interestGroup = $this->_interestGroupFactory->create();
         $interestGroup->getBySubscriberIdStoreId($subscriberId, $storeId);
         $serialized = $interestGroup->getGroupdata();
-        if ($serialized&&is_array($interest)&&count($interest)) {
+        if ($serialized) {
             try {
                 $groups = $this->unserialize($serialized);
                 if (isset($groups['group'])) {
                     foreach ($groups['group'] as $key => $value) {
-                        if (array_key_exists($key, $interest)) {
+                        if (isset($interest[$key])) {
                             if (is_array($value)) {
                                 foreach ($value as $groupId) {
                                     foreach ($interest[$key]['category'] as $gkey => $gvalue) {
