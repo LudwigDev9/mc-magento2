@@ -23,9 +23,18 @@
     "wiki": "https://connect.mailchimp.com/integrations/magento",
     "forum": "http://ebizmarts.com/forums/view/6"
   },
-  "require" : {
-    "magento/framework": "102.0.*",
-    "ebizmarts/mailchimp-lib": ">=3.0.27",
-    "ext-json": "*"
+  "require": {
+        "dev9/mc-magento2": "dev-bugfix"
+    }
+  "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/LudwigDev9/mc-magento2.git"
+        }
+    ],	
+  "config": {
+    "preferred-install": {
+      "*": "source"
+    }
   }
 }
