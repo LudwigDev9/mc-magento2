@@ -388,6 +388,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         }
         return $this->customerAtt;
     }
+
+    public function resetMapFields()
+    {
+        $this->_mapFields = null;
+    }
+
     public function getMapFields($storeId = null)
     {
         if (!$this->_mapFields) {
@@ -413,33 +419,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $this->_mapFields;
     }
 	
-    /**
-	    *      * Custom Date format
-	    *           */
-//        const FORMAT_DATE = 'd-m-Y H:i:s';
-
-        /**
-	 *      * @var DateTimeFactory
-	 *           */
-//        private $dateTimeFactory;
-
-//	    public function __construct(
-//		   DateTimeFactory $dateTimeFactory
-//	 ) {
-//		  $this->dateTimeFactory = $dateTimeFactory;
-//	    }
-
-	    /**
-		    *      * Get Current Format date
-		    *           *
-		    *                * @return string
-		    *                     */
-     
-
-
     public function getDateFormat(): string
     {
-	    // return 'm/d/Y';
 	    
 	    $dateModel = $this->dateTimeFactory->create();
 	    return $dateModel->gmtDate(self::FORMAT_DATE);
@@ -953,6 +934,32 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             }
         }
     }
+
+    public function saveJsUrl($storeId, $scope = null, $mailChimpStoreId = null)
+    {
+        if (!$scope) {
+            $scope = \Magento\Store\Model\ScopeInterface::SCOPE_STORES;
+        }
+        if ($this->getConfigValue(self::XML_PATH_ACTIVE, $storeId, $scope)) {
+            try {
+                $api = $this->getApi($storeId);
+                $storeData = $api->ecommerce->stores->get($mailChimpStoreId);
+                if (isset($storeData['connected_site']['site_script']['url'])) {
+                    $url = $storeData['connected_site']['site_script']['url'];
+                    $this->_config->saveConfig(
+                        self::XML_MAILCHIMP_JS_URL,
+                        $url,
+                        $scope,
+                        $storeId
+                    );
+                }
+            } catch (\Mailchimp_Error $e) {
+                $this->log($e->getFriendlyMessage());
+            }
+        }
+
+    }
+
     public function getJsUrl($storeId)
     {
         $url = $this->getConfigValue(self::XML_MAILCHIMP_JS_URL, $storeId);
@@ -1091,6 +1098,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     /**
      * @param $tableName
+     * @param string $conn
      * @return string
      */
     public function getTableName($tableName, $conn = ResourceConnection::DEFAULT_CONNECTION)
@@ -1133,6 +1141,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
                 }
             } else {
                 $this->log(__('Error retrieving interest groups for store ').$storeId);
+                 $rc = [];
             }
         } catch (\Mailchimp_Error $e) {
             $this->log($e->getFriendlyMessage());
@@ -1151,12 +1160,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $interestGroup = $this->_interestGroupFactory->create();
         $interestGroup->getBySubscriberIdStoreId($subscriberId, $storeId);
         $serialized = $interestGroup->getGroupdata();
-        if ($serialized) {
+        if ($serialized&&is_array($interest)&&count($interest)) {
             try {
                 $groups = $this->unserialize($serialized);
                 if (isset($groups['group'])) {
                     foreach ($groups['group'] as $key => $value) {
-                        if (isset($interest[$key])) {
+                        if (array_key_exists($key, $interest)) {
                             if (is_array($value)) {
                                 foreach ($value as $groupId) {
                                     foreach ($interest[$key]['category'] as $gkey => $gvalue) {
